@@ -19,6 +19,16 @@ void init_GPIO_CR(unsigned short port,unsigned short pin,unsigned short dir, uns
 	*CR &= ~(uint32_t)(0xF << (pin * 4)); 
   *CR |= (uint32_t)((dir << (pin * 4)) | (opt << (pin * 4 + 2)));
 }
+
+void D_Output_toggle(unsigned short port, unsigned short pin) {
+    uint32_t *ODR;
+    // Adress GPIOX_ODR
+    ODR = (uint32_t *)(ADD[port-1] + 0x0C);
+    // Toggle Pin
+    *ODR ^= (1 << pin);
+}
+
+
 void D_Output(unsigned short port,unsigned short pin, unsigned short value){ 
 	uint32_t *ODR;
 	//Adress GPIOX_ODR
@@ -34,18 +44,50 @@ void D_Output(unsigned short port,unsigned short pin, unsigned short value){
 	*ODR = ODR_value;
 }
 
-uint8_t D_Input(unsigned short port, unsigned short pin){
+uint8_t D_Input(unsigned short port, unsigned short pin){ 
 	uint32_t *IDR;
 	//Adress GPIOX_IDR
 	IDR = (uint32_t *)(ADD[port-1]+0x08);
 	uint32_t IDR_value = *IDR;
 	return (IDR_value >> pin) & 0x01;
+	//return IDR_value;
 }
 
-void delay(uint32_t ms){
-	uint32_t delay_count = (CLOCK_FREQ / 1000) / 5; 
-  while (ms--){
-			for (uint32_t i = 0; i < delay_count; i++){
-			}
+
+void Delay2(uint32_t ms) {
+		volatile int timer2_initialized = 0; 
+    if (!timer2_initialized) {
+        // Enable clock for TIM2
+        RCC_APB1ENR |= RCC_APB1ENR_TIM2EN;
+
+        // Cofig for TIM2 iterupt 1ms
+        TIM2_PSC = (CLOCK_FREQ / 1000) - 1;  // 8MHz
+        TIM2_ARR = 10;                      // Auto reload value
+        TIM2_CNT = 0;                      // Reset counter
+        TIM2_CR1 |= TIM_CR1_CEN;           // Active TIM2, DIR = 0, OPM = 0
+        timer2_initialized = 1;  
+    }
+    while (ms > 0) {
+        TIM2_CNT = 0;  // Reset counter
+        while (TIM2_CNT < 10);  
+        ms-=1;
     }
 }
+
+void Delay(uint32_t ms){
+	volatile int timer2_initialized = 0; 
+	if (!timer2_initialized) {
+		// Enable clock for TIM1
+    RCC_APB2_ENR |= (1 << 11);
+		// Cofig for TIM1 iterupt 1ms
+		TIM1_PSC = 8000-1;  // Prescaler = 
+		TIM1_ARR = 1000-1;  // Auto-reload value = 
+		TIM1_CR1 |= (1 << 3); //OPM
+	}
+  if(ms > 0){
+		ms--;  
+    TIM1_CR1 |= (1 << 0);
+		while (TIM1_CR1 & (1 << 0));
+  }
+}
+
